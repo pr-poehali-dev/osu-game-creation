@@ -93,6 +93,12 @@ export default function GameScreen({ level, onFinish, onExit, settings }: GameSc
   // Throttle HUD updates — only every 4 frames
   const hudFrameRef = useRef(0);
 
+  // FPS counter — written directly to DOM, zero React overhead
+  const fpsRef      = useRef(0);
+  const fpsFrames   = useRef(0);
+  const fpsLastTime = useRef(performance.now());
+  const fpsDomRef   = useRef<HTMLSpanElement>(null);
+
   const spawnEffect = useCallback((x: number, y: number, rating: "300" | "100" | "50" | "miss") => {
     const id = ++effectIdRef.current;
     setEffects(prev => [...prev, { id, x, y, rating, timestamp: Date.now() }]);
@@ -175,6 +181,22 @@ export default function GameScreen({ level, onFinish, onExit, settings }: GameSc
     const tick = () => {
       const now = Date.now() - startRef.current;
       hudFrameRef.current++;
+
+      // FPS — direct DOM write, no setState
+      fpsFrames.current++;
+      const perfNow = performance.now();
+      const elapsed = perfNow - fpsLastTime.current;
+      if (elapsed >= 500) {
+        fpsRef.current = Math.round((fpsFrames.current * 1000) / elapsed);
+        fpsFrames.current = 0;
+        fpsLastTime.current = perfNow;
+        if (fpsDomRef.current) {
+          fpsDomRef.current.textContent = `${fpsRef.current}fps`;
+          const color = fpsRef.current >= 55 ? "#34d399" : fpsRef.current >= 30 ? "#fbbf24" : "#f87171";
+          fpsDomRef.current.style.color = color;
+          fpsDomRef.current.style.textShadow = `0 0 8px ${color}`;
+        }
+      }
 
       for (const note of patternRef.current) {
         if (note.spawned) continue;
@@ -345,9 +367,22 @@ export default function GameScreen({ level, onFinish, onExit, settings }: GameSc
             <span className="text-muted-foreground">или клик мышью</span>
           </div>
         </div>
-        <div className="text-xs font-zen text-muted-foreground text-right">
-          <div className="text-white font-bold">{level.title}</div>
-          <div>{level.artist}</div>
+        <div className="text-right space-y-1">
+          <div className="text-xs font-zen text-muted-foreground">
+            <div className="text-white font-bold">{level.title}</div>
+            <div>{level.artist}</div>
+          </div>
+          {/* FPS — osu!-style, updated directly via DOM ref */}
+          <div className="flex items-center justify-end gap-1.5">
+            <span className="font-orbitron text-[11px] text-muted-foreground/50">FPS</span>
+            <span
+              ref={fpsDomRef}
+              className="font-orbitron font-bold text-sm tabular-nums"
+              style={{ color: "#34d399", textShadow: "0 0 8px #34d399", minWidth: "52px", textAlign: "right" }}
+            >
+              --
+            </span>
+          </div>
         </div>
       </div>
 
