@@ -77,4 +77,6 @@ export interface GameSettings {
   overallDifficulty: number;
   cursorSize: number;
   showFPS: boolean;
+  key1: string;
+  key2: string;
 }

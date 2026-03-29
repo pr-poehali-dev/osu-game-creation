@@ -6,7 +6,7 @@ interface GameScreenProps {
   level: Level;
   onFinish: (state: GameState) => void;
   onExit: () => void;
-  settings: { masterVolume: number; sfxVolume: number };
+  settings: { masterVolume: number; sfxVolume: number; key1: string; key2: string };
 }
 
 const CIRCLE_RADIUS = 36;
@@ -33,6 +33,10 @@ const gradeColor: Record<string, string> = {
 export default function GameScreen({ level, onFinish, onExit, settings }: GameScreenProps) {
   const cfg = DIFFICULTY_CONFIG[level.difficulty] || DIFFICULTY_CONFIG.normal;
   const canvasRef = useRef<HTMLDivElement>(null);
+  const key1Ref = useRef(settings.key1.toLowerCase());
+  const key2Ref = useRef(settings.key2.toLowerCase());
+  useEffect(() => { key1Ref.current = settings.key1.toLowerCase(); }, [settings.key1]);
+  useEffect(() => { key2Ref.current = settings.key2.toLowerCase(); }, [settings.key2]);
   const [circles, setCircles] = useState<HitCircle[]>([]);
   const [effects, setEffects] = useState<HitEffect[]>([]);
   const [state, setState] = useState<GameState>({
@@ -106,6 +110,61 @@ export default function GameScreen({ level, onFinish, onExit, settings }: GameSc
       return prev.map(c => c.id === circleId ? { ...c, hit: rating, hitAt: Date.now() } : c);
     });
   }, [cfg, spawnEffect]);
+
+  // Keyboard hit — hits the earliest unhit circle
+  const handleKeyHit = useCallback(() => {
+    setCircles(prev => {
+      const active = prev
+        .filter(c => c.hit === null)
+        .sort((a, b) => a.hitTime - b.hitTime);
+      const circle = active[0];
+      if (!circle) return prev;
+      const now = Date.now() - startTimeRef.current;
+      const diff = Math.abs(now - circle.hitTime);
+      let rating: "300" | "100" | "50" | "miss";
+      if (diff < cfg.hitWindow300) rating = "300";
+      else if (diff < cfg.hitWindow100) rating = "100";
+      else if (diff < cfg.hitWindow50) rating = "50";
+      else rating = "miss";
+      spawnEffect(circle.x, circle.y, rating);
+      setState(s => {
+        const newCombo = rating === "miss" ? 0 : s.combo + 1;
+        const points = rating === "300" ? 300 : rating === "100" ? 100 : rating === "50" ? 50 : 0;
+        const comboBonus = Math.floor(newCombo / 10);
+        const ns: GameState = {
+          ...s,
+          score: Math.floor(s.score + points * (1 + comboBonus * 0.1)),
+          combo: newCombo,
+          maxCombo: Math.max(s.maxCombo, newCombo),
+          hp: Math.max(0, Math.min(100, s.hp + (rating === "miss" ? -15 : 5))),
+          hits300: s.hits300 + (rating === "300" ? 1 : 0),
+          hits100: s.hits100 + (rating === "100" ? 1 : 0),
+          hits50: s.hits50 + (rating === "50" ? 1 : 0),
+          misses: s.misses + (rating === "miss" ? 1 : 0),
+          accuracy: 0,
+        };
+        const total = ns.hits300 + ns.hits100 + ns.hits50 + ns.misses;
+        ns.accuracy = total === 0 ? 100 : Math.max(0, ((ns.hits300 * 300 + ns.hits100 * 100 + ns.hits50 * 50) / (total * 300)) * 100);
+        stateRef.current = ns;
+        return ns;
+      });
+      return prev.map(c => c.id === circle.id ? { ...c, hit: rating, hitAt: Date.now() } : c);
+    });
+  }, [cfg, spawnEffect]);
+
+  useEffect(() => {
+    if (!isRunning) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      const k = e.key.toLowerCase();
+      if (k === key1Ref.current || k === key2Ref.current) {
+        e.preventDefault();
+        handleKeyHit();
+      }
+      if (k === "escape") onExit();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [isRunning, handleKeyHit, onExit]);
 
   // Game loop
   useEffect(() => {
@@ -315,12 +374,22 @@ export default function GameScreen({ level, onFinish, onExit, settings }: GameSc
 
       {/* Bottom stats */}
       <div className="absolute bottom-6 left-6 right-6 flex justify-between items-end z-20">
-        <div className="text-xs font-zen text-muted-foreground space-y-1">
+        <div className="text-xs font-zen text-muted-foreground space-y-1.5">
           <div className="flex gap-3">
             <span className="text-blue-400">300: {state.hits300}</span>
             <span className="text-emerald-400">100: {state.hits100}</span>
             <span className="text-yellow-400">50: {state.hits50}</span>
             <span className="text-red-400">MISS: {state.misses}</span>
+          </div>
+          {/* Key indicators */}
+          <div className="flex gap-2">
+            <kbd className="glass px-2.5 py-1 rounded-lg text-xs font-orbitron text-sakura border border-sakura/30 uppercase">
+              {settings.key1}
+            </kbd>
+            <kbd className="glass px-2.5 py-1 rounded-lg text-xs font-orbitron text-sakura border border-sakura/30 uppercase">
+              {settings.key2}
+            </kbd>
+            <span className="text-muted-foreground self-center">или клик мышью</span>
           </div>
         </div>
         <div className="text-xs font-zen text-muted-foreground text-right">

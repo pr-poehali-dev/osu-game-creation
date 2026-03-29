@@ -1,5 +1,6 @@
 import { GameSettings, Difficulty } from "@/types/game";
 import Icon from "@/components/ui/icon";
+import { useState, useEffect } from "react";
 
 interface SettingsScreenProps {
   settings: GameSettings;
@@ -108,21 +109,30 @@ export default function SettingsScreen({ settings, onUpdate, onBack }: SettingsS
         </Section>
 
         {/* Controls */}
-        <Section title="⌨️ Управление" subtitle="Настройки клавиш">
-          <div className="space-y-2">
-            {[
-              { action: "Попадание 1", key: "ЛКМ / Z" },
-              { action: "Попадание 2", key: "ПКМ / X" },
-              { action: "Пауза", key: "Escape" },
-              { action: "Перезапуск", key: "`" },
-            ].map(item => (
-              <div key={item.action} className="flex items-center justify-between py-2.5 border-b border-border last:border-0">
-                <span className="text-sm font-zen text-muted-foreground">{item.action}</span>
-                <kbd className="glass px-3 py-1 rounded-lg text-xs font-orbitron text-white border border-sakura/20">
-                  {item.key}
-                </kbd>
-              </div>
-            ))}
+        <Section title="⌨️ Управление" subtitle="Клавиши попадания по кругам">
+          <div className="space-y-3">
+            <KeyBindRow
+              label="Клавиша 1"
+              currentKey={settings.key1}
+              onChange={k => set("key1", k)}
+            />
+            <KeyBindRow
+              label="Клавиша 2"
+              currentKey={settings.key2}
+              onChange={k => set("key2", k)}
+            />
+            <div className="pt-2 border-t border-border space-y-2">
+              {[
+                { action: "Выход из игры", key: "Escape" },
+              ].map(item => (
+                <div key={item.action} className="flex items-center justify-between py-1">
+                  <span className="text-sm font-zen text-muted-foreground">{item.action}</span>
+                  <kbd className="glass px-3 py-1 rounded-lg text-xs font-orbitron text-white border border-sakura/20">
+                    {item.key}
+                  </kbd>
+                </div>
+              ))}
+            </div>
           </div>
         </Section>
 
@@ -190,6 +200,49 @@ function ToggleRow({ label, value, onChange }: { label: string; value: boolean; 
         <div
           className={`absolute top-1 w-4 h-4 rounded-full bg-white shadow transition-all ${value ? "left-6" : "left-1"}`}
         />
+      </button>
+    </div>
+  );
+}
+
+function KeyBindRow({ label, currentKey, onChange }: { label: string; currentKey: string; onChange: (k: string) => void }) {
+  const [listening, setListening] = useState(false);
+
+  useEffect(() => {
+    if (!listening) return;
+    const onKey = (e: KeyboardEvent) => {
+      e.preventDefault();
+      // Ignore modifier-only keys and Escape
+      if (["Escape", "Shift", "Control", "Alt", "Meta"].includes(e.key)) {
+        setListening(false);
+        return;
+      }
+      onChange(e.key.toLowerCase());
+      setListening(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [listening, onChange]);
+
+  return (
+    <div className="flex items-center justify-between">
+      <div>
+        <span className="text-sm font-zen text-white">{label}</span>
+        <div className="text-xs text-muted-foreground font-zen mt-0.5">Мышь или клавиатура</div>
+      </div>
+      <button
+        onClick={() => setListening(true)}
+        className={`relative px-4 py-2 rounded-xl font-orbitron font-bold text-sm transition-all min-w-[80px] text-center ${
+          listening
+            ? "bg-sakura/20 border border-sakura text-sakura animate-pulse"
+            : "glass border border-sakura/20 text-white hover:border-sakura/50 hover:bg-sakura/10"
+        }`}
+      >
+        {listening ? (
+          <span className="text-xs font-zen">Нажми клавишу…</span>
+        ) : (
+          <span className="uppercase tracking-widest">{currentKey}</span>
+        )}
       </button>
     </div>
   );

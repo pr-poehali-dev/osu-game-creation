@@ -18,6 +18,8 @@ const DEFAULT_SETTINGS: GameSettings = {
   overallDifficulty: 5,
   cursorSize: 1,
   showFPS: false,
+  key1: "z",
+  key2: "x",
 };
 
 export default function Index() {
@@ -82,7 +84,7 @@ export default function Index() {
             level={selectedLevel}
             onFinish={handleFinish}
             onExit={() => setScreen("menu")}
-            settings={{ masterVolume: settings.masterVolume, sfxVolume: settings.sfxVolume }}
+            settings={{ masterVolume: settings.masterVolume, sfxVolume: settings.sfxVolume, key1: settings.key1, key2: settings.key2 }}
           />
         )}
 
